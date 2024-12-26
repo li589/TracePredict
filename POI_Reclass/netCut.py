@@ -129,7 +129,7 @@ def net_generate(gdf, maxx, minx, maxy, miny, n = 5, m = 5):
     draw_polygons(gdf, grid)
     draw_polygons(merged_gdf, grid_clipped)
     draw_shp_file_with_centroids(merged_gdf, grid)
-    draw_shp_file_with_centroids(merged_gdf, grid_clipped)
+    # draw_shp_file_with_centroids(merged_gdf, grid_clipped)
     return merged_gdf, grid, coordinates_matrix
 
 def reflect(loc_matrix, POI_dt, n, m, xmin, xmax, ymin, ymax):
@@ -183,7 +183,7 @@ def reflect(loc_matrix, POI_dt, n, m, xmin, xmax, ymin, ymax):
     df['index'] = df.index
     return df
 
-def one_path_main(shp_filename, poi_filename, run_number, net_width_num = 7, net_height_num = 5):
+def one_path_main(shp_filename, poi_filename, run_number, net_width_num = 5, net_height_num = 5):
     try:
         if not os.path.exists(shp_filename):
             print(f"Error: {shp_filename} does not exist.")
@@ -198,7 +198,7 @@ def one_path_main(shp_filename, poi_filename, run_number, net_width_num = 7, net
     else:
         print(f"Error: Invalid input type for shp_filename. Expected a string or a GeoDataFrame.")
         return
-    draw_shp_file(gdf)
+    # draw_shp_file(gdf)
     # 创建网格
     _, grid_clipped, location_matrix = net_generate(gdf, xmin, xmax, ymin, ymax, net_width_num, net_height_num)
     
@@ -218,7 +218,7 @@ def one_path_main(shp_filename, poi_filename, run_number, net_width_num = 7, net
     run_number = run_number + 1
     return Output_df, poi_df, net_width_num, net_height_num, xmin, xmax, ymin, ymax, gdf.crs
 
-def make_iterator_netCreate(input_data, poi_df, xmin, xmax, ymin, ymax, crs_set, run_number = 0, n = 5, m = 5, net_id = 4):
+def make_iterator_netCreate(input_data, poi_df, xmin, xmax, ymin, ymax, crs_set, run_number = 0, n = 5, m = 5, net_id = 0):
     center_line = input_data[input_data['index']==net_id]
     center_list  = [center_line['X'].values[0], center_line['Y'].values[0]]
     newX_min, newX_max, newY_min, newY_max, _, _ = get_new_net_range(center_list, xmin, xmax, ymin, ymax, n, m)
@@ -226,13 +226,12 @@ def make_iterator_netCreate(input_data, poi_df, xmin, xmax, ymin, ymax, crs_set,
     Output_data, poi_df, net_width_num, net_height_num, xmin, xmax, ymin, ymax, crs_set = one_path_main(new_gdf, poi_df, run_number, n, m)
     return Output_data, poi_df, net_width_num, net_height_num, xmin, xmax, ymin, ymax, crs_set
 
-def main(shp_filename, poi_filename, net_width_num = 5, net_height_num = 5):
+def main(shp_filename, poi_filename, net_width_num = 5, net_height_num = 5, net_id_set = 3):
     # shp_filename = 'dataset\\GeoData\\Beijing_CityShape(reproject)\\beijing-区县界_region.shp'
     # poi_filename = 'dataset/GeoData/AOI_POI/POI_ReProjection.csv'
     # net_width_num = 20
     # net_height_num = 50
     Output_data, poi_df, net_width_num, net_height_num, xmin, xmax, ymin, ymax, crs_set = one_path_main(shp_filename, poi_filename, net_width_num, net_height_num)
-    net_id_set = 3
     global run_number
     make_iterator_netCreate(Output_data, poi_df, xmin, xmax, ymin, ymax, crs_set, run_number, net_width_num, net_height_num, net_id_set)
 
@@ -268,6 +267,6 @@ if __name__ == '__main__':
     shp_filename = 'dataset\\GeoData\\Beijing_CityShape(reproject)\\beijing-区县界_region.shp'
     poi_filename = 'dataset/GeoData/AOI_POI/POI_ReProjection.csv'
     output_dir = "dataset\\GeoData\\Net"
-    main(shp_filename, poi_filename)
+    main(shp_filename, poi_filename, 1)
     gdf = gpd.read_file(shp_filename)
     proj2geo(output_dir , gdf.crs)

@@ -8,12 +8,12 @@ from multiprocessing import cpu_count
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from POI_Reclass.poi_scan import main as poi_scan
-from cluster.cluster_mod import main as data_creator, process_csv as read_time_1_csv
+from Cluster.cluster_mod import main as data_creator, process_csv as read_time_1_csv
 from dataset.traceDect import mult_main as trace_dect
 from POI_Reclass.patch_timeslicing import main as patch_timeslicing
 from POI_Reclass.reClass_mod import load_data as reclass_load_poi_dt, main as reclass_main
 from Markov_chain import group_main as Markov_group_main, one_people_main as Markov_one_people_main, draw as draw_transMatrix
-from cluster.Gabor_Kmeans_Cluster import img_inside_main as pre_cluster, main as cluster_main, classify_new_images as patch_new_cluster
+from Cluster.Gabor_Kmeans_Cluster import img_inside_main as pre_cluster, main as cluster_main, classify_new_images as patch_new_cluster
 
 class PreProcess():
     def __init__(self, core_dir):
