@@ -1,85 +1,74 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="brand-kicker">TracePredict</p>
+        <h1 class="brand-title">轨迹预测演示前端</h1>
+      </div>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+      <nav class="nav">
+        <RouterLink to="/">轨迹展示</RouterLink>
+        <RouterLink to="/about">说明</RouterLink>
       </nav>
-    </div>
-  </header>
+    </header>
 
-  <RouterView />
+    <RouterView />
+  </div>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.app-shell {
+  display: grid;
+  gap: 1.5rem;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
+.brand-kicker {
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
+.brand-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.nav {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.nav a {
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  color: #334155;
+  background: rgba(148, 163, 184, 0.12);
 }
 
-nav a:first-of-type {
-  border: 0;
+.nav a.router-link-exact-active {
+  color: #fff;
+  background: #2563eb;
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
+@media (max-width: 720px) {
+  .topbar {
+    align-items: start;
+    flex-direction: column;
   }
 }
 </style>

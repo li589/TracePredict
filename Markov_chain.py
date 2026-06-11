@@ -236,8 +236,8 @@ def core_markov_chain(data, data_id, LSTM_out_put_dir, input_size = 12, num_epoc
     # df_tmatrix.to_csv(os.path.join(out_put_dir, "transition_matrix.csv"), index=False)
 ################################################################################################################################
 def group_main(data, data_id, data_shp, output_dir, 
-               LSTM_out_put_dir = os.path.join("dataset\G-csv\Core\LSTM"), 
-               file_path = os.path.join("cluster/Gabor_Kmeans_Cluster_results.json")):
+               LSTM_out_put_dir = os.path.join("dataset", "G-csv", "Core", "LSTM"), 
+               file_path = os.path.join("cluster", "Gabor_Kmeans_Cluster_results.json")):
     # 配置
     print(f"data_shape: {data_shp}")
     class_json = None
@@ -358,7 +358,7 @@ def one_people_main(data, data_id, data_shp, output_dir):
 
 if __name__ == '__main__':
     data, data_id, data_shp = data_creator("dataset\\G-csv\\GeoPlus\\timePatch_1")
-    out_put_dir = os.path.join("dataset\G-csv\Core\Markov_chain")
+    out_put_dir = os.path.join("dataset", "G-csv", "Core", "Markov_chain")
     with ProcessPoolExecutor(max_workers=2) as executor:
         future_one = executor.submit(group_main, data, data_id, data_shp, out_put_dir)
         future_two = executor.submit(one_people_main, data, data_id, data_shp, out_put_dir)

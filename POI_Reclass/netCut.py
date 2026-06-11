@@ -62,7 +62,7 @@ def read_poi_csv(filename, target_crs):
         print('Warning: No new class symbol')
     return gdf
 
-def output_to_csv(gdf, output_filename = "dataset\GeoData\AOI_POI\POI_ReProjection.csv"):
+def output_to_csv(gdf, output_filename=os.path.join("dataset", "GeoData", "AOI_POI", "POI_ReProjection.csv")):
     gdf.to_csv(output_filename, index=False)
     print(f"Data saved to {output_filename}")
 

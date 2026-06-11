@@ -1,6 +1,5 @@
 from pyproj import Transformer
 from termcolor import colored
-from openai import OpenAI
 import geopandas as gpd
 import pandas as pd
 import numpy as np
@@ -8,6 +7,7 @@ import random
 import json
 import os
 from POI_Reclass.netCut import proj2geo, one_path_main as first_path_main, get_new_net_range as gen_new_net_range, create_one_blank as gen_one_net
+from llm_provider import chat_completion, current_provider_summary
 
 run_number = 0
 net_num_mark = -1
@@ -24,6 +24,25 @@ def cut_num_length(line):
     for i in range(len(line)):
         line[i] = round(float(line[i]), 3)
     return line
+
+def parse_grid_data(grid_data):
+    if isinstance(grid_data, list):
+        return grid_data
+    if isinstance(grid_data, str):
+        try:
+            return json.loads(grid_data)
+        except Exception:
+            lines = [line for line in grid_data.strip().split('\n') if line.strip()]
+            return [json.loads(line) for line in lines]
+    raise TypeError("grid_data must be a JSON string or list")
+
+def serialize_poi_data(poi_data):
+    if isinstance(poi_data, pd.DataFrame):
+        return poi_data.to_dict(orient='records')
+    if isinstance(poi_data, str):
+        return json.loads(poi_data)
+    return poi_data
+
 def response_analysis(order, target):
     global net_num_mark
     if isinstance(order, str) and isinstance(target, str):
@@ -114,13 +133,7 @@ def make_init_train_dataset(predict_csv_path, shp_filename, poi_filename,
     return json_train_dataset, json_net_train_dataset, train_range_dict_dataset, train_xy_num_dataset, gdf_crs, poi_df
 
 def refine_grid(response, grid_data, big_grid_size, small_grid_size, cut_num_width, cut_num_height, gdf_crs, poi_df):
-    net_dt = grid_data
-    try:
-        net_dt = json.loads(grid_data)
-    except Exception as e:
-        lines = net_dt.strip().split('\n')
-        net_dt = [json.loads(line) for line in lines]
-        print(colored(f"Error parsing JSON: {e}", "red"))
+    net_dt = parse_grid_data(grid_data)
     try:
         response = int(response)
     except Exception as e:
@@ -156,15 +169,12 @@ def refine_grid(response, grid_data, big_grid_size, small_grid_size, cut_num_wid
     return json_net_train_dataset, train_range_dict_dataset, train_xy_num_dataset
 
 def POI_calculate(data2, data3, poi_df):
-    POI_num = len(data2)
+    POI_num = len(parse_grid_data(data2))
     if POI_num <= 100:
         target_poi_df = poi_df[(poi_df["WGS-w"]>=data3["xmin"]) & (poi_df["WGS-w"]<=data3["xmax"]) & (poi_df["WGS-j"]>=data3["ymin"]) & (poi_df["WGS-j"]<=data3["ymax"])]
         target_poi_df = target_poi_df[["大类","WGS-w", "WGS-j"]]
         return True, target_poi_df
     return False, None 
-
-# 初始化 OpenAI 客户端
-# client = OpenAI(api_key="")
 
 def interact_with_gpt(trajectory_point, grid_data, target_crs, big_grid_size, small_grid_size, cut_num_width, cut_num_height, gdf_crs, poi_df):
     """
@@ -201,23 +211,18 @@ def interact_with_gpt(trajectory_point, grid_data, target_crs, big_grid_size, sm
         "Note: When the response is returned, do not say a large section of analysis, just output the result."
         # 注意：当返回响应时，不要说大量的分析，只输出结果。
     }
-    # 向GPT提供轨迹点和网格数据
-    chat_completion = client.chat.completions.create(
-        messages=[
-            system_message,  # 提供任务背景和规则
-            {"role": "user", "content": f"Trajectory point(data1): {trajectory_point} \n , current grid data(data2): {grid_data} \n , Data 2 and 3 will be sent to you shortly, please wait..."}
-        ],
-        model="gpt-4o",
-    )
-    print(colored(f"chat_completion process: {chat_completion.choices[0].message.content}", "blue"))
-    chat_completion = client.chat.completions.create(
-        messages=[
-            system_message,  # 提供任务背景和规则
-            {"role": "user", "content": f"Current grid total size(data3): {big_grid_size}, Each small cell size(data4): {small_grid_size} \n . Please start working."}
-        ],
-        model="gpt-4o",
-    )
-    response = chat_completion.choices[0].message.content
+    user_message = {
+        "role": "user",
+        "content": (
+            f"Trajectory point(data1): {trajectory_point}\n"
+            f"Current grid data(data2): {grid_data}\n"
+            f"Current grid total size(data3): {big_grid_size}\n"
+            f"Each small cell size(data4): {small_grid_size}\n"
+            "Please start working."
+        )
+    }
+    print(colored(f"LLM provider: {current_provider_summary()}", "cyan"))
+    response = chat_completion([system_message, user_message])
     print(colored(f"GPT response: {response}", "blue"))
     if isinstance(response, str):
         response_ = response.split(" ")[-1]
@@ -228,7 +233,7 @@ def interact_with_gpt(trajectory_point, grid_data, target_crs, big_grid_size, sm
     inif, resPOI = POI_calculate(grid_data, big_grid_size, poi_df)
     if inif:
         print(colored(f"Start Prediction...", "green"))
-        get_prediction(trajectory_point, response, resPOI)
+        return get_prediction(trajectory_point, response, resPOI)
     else:
     # 如果GPT反馈-1，表示不需要再细分网格，开始预测
     # if response_analysis(response, "-1"):
@@ -246,14 +251,18 @@ def get_prediction(trajectory_point, grid_number, poi_df):
     """
     获取轨迹点的预测位置。
     """
-    poi_json = json.loads(poi_df)
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {"role": "user", "content": f"Predict the next position for trajectory point {trajectory_point} in grid {grid_number}. The POI data in this grid is {poi_json}. Please output forecast coordinates." }
-        ],
-        model="gpt-4o",
+    poi_json = serialize_poi_data(poi_df)
+    prediction = chat_completion(
+        [
+            {
+                "role": "user",
+                "content": (
+                    f"Predict the next position for trajectory point {trajectory_point} in grid {grid_number}. "
+                    f"The POI data in this grid is {poi_json}. Please output forecast coordinates."
+                ),
+            }
+        ]
     )
-    prediction = chat_completion.choices[0].message.content
     print(colored(f"Prediction: {prediction}", "blue"))
     return prediction
 

@@ -26,7 +26,7 @@ reclass_list = {
 }
 
 def load_data(POI_out_dir):
-    classFile = pd.read_csv(os.path.join("dataset\GeoData\AOI_POI\AOIClass.csv"))
+    classFile = pd.read_csv(os.path.join("dataset", "GeoData", "AOI_POI", "AOIClass.csv"))
     poi_csvList = [[os.path.join(POI_out_dir, f), f] for f in os.listdir(POI_out_dir) if f.endswith(".csv")]
     return poi_csvList, classFile
 

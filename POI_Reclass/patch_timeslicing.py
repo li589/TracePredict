@@ -239,7 +239,7 @@ if __name__ == "__main__":
     reClass_main(poi_list, classF, output_dir)
 
     cut_number = 48
-    csv_dir = os.path.join("dataset\G-csv\GeoPlus\Probability")
+    csv_dir = os.path.join("dataset", "G-csv", "GeoPlus", "Probability")
     out_dir_0 = os.path.join("dataset/G-csv/GeoPlus/timePatch_0")
     out_dir_1 = os.path.join("dataset/G-csv/GeoPlus/timePatch_1")
     main(cut_number, csv_dir, out_dir_0, out_dir_1)

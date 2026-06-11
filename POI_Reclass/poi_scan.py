@@ -39,13 +39,13 @@ def data_preprocess():
     df_poi.to_csv("dataset\\GeoData\\AOI_POI\\POI.csv", index=False)
 
 def geoData_restats(class_main):
-    poi_csv = pd.read_csv("dataset\GeoData\AOI_POI\POI.csv")
+    poi_csv = pd.read_csv(os.path.join("dataset", "GeoData", "AOI_POI", "POI.csv"))
     # Calculate statistics for each column
     big_POIclass = poi_csv["大类"]
     big_POIclass_set = set(big_POIclass)
     big_POIclass_num = len(big_POIclass_set)
     print(f'POI大类: ({big_POIclass_num}类) {big_POIclass_set}')
-    aoi_csv = pd.read_csv("dataset\GeoData\AOI_POI\AOI.csv")
+    aoi_csv = pd.read_csv(os.path.join("dataset", "GeoData", "AOI_POI", "AOI.csv"))
     big_AOIclass = aoi_csv["type_C_100"]
     big_AOIclass_set = set(big_AOIclass)
     big_AOIclass_num = len(big_AOIclass_set)
@@ -70,7 +70,7 @@ def geoData_restats(class_main):
                   '公司企业','运动健身','科教文化','金融机构','休闲娱乐',
                   '汽车相关','商务住宅','旅游景点','生活服务','政府机构' ] # 15 Classes
     # Rule of reflection for index
-    new_class_rule = pd.read_csv("dataset\GeoData\AOI_POI\AOIClass.csv")
+    new_class_rule = pd.read_csv(os.path.join("dataset", "GeoData", "AOI_POI", "AOIClass.csv"))
     new_class_rule["index"] = new_class_rule.index
     new_class_names_list = list(new_class_rule["res"])
     new_class_ruleNum_list = []
@@ -107,7 +107,7 @@ def geoData_restats(class_main):
     for rule_line in tqdm(new_poi_class, desc="POI Reclass"):
         new_class_symbol.append(class_main.index(rule_line))
     poi_csv["new_class_symbol"] = new_class_symbol
-    poi_csv.to_csv("dataset\GeoData\AOI_POI\POI_new.csv")
+    poi_csv.to_csv(os.path.join("dataset", "GeoData", "AOI_POI", "POI_new.csv"))
 
 def AOI_Correlation(aoi_shp, one_trace_csv, class_main, output_path):
     gdf_shapes = gpd.read_file(aoi_shp, encoding='gbk', engine='pyogrio') # 地理坐标系
@@ -151,7 +151,7 @@ def inRoad_Correlation(road_shp, one_trace_csv, gdf_points, output_path):
     gdf_polygons = gpd.read_file(road_shp) # 投影：WGS 1984 UTM, Zone 50 North, Meter
     gdf_polygons = gdf_polygons.to_crs(epsg=4326) # 投影转经纬
     points_within_polygons = gpd.sjoin(gdf_points, gdf_polygons, how='inner', predicate='within')
-    with open("dataset\G-csv\log\inRoad.log", "w") as log:
+    with open(os.path.join("dataset", "G-csv", "log", "inRoad.log"), "w") as log:
         log.write(f"Total points: {len(points_within_polygons)}:\n {points_within_polygons.index}\n")
     print('\n')
     for index in tqdm(points_within_polygons.index, desc="Create Probability List for each point(inRoad)", colour="blue"):
@@ -232,7 +232,7 @@ def POI_Correlation(poi_csv, one_trace_csv, gdf_points, class_main, output_path)
     return gdf_query_points
 
 def dbf_modify():
-    dbf_path = os.path.join("dataset\GeoData\AOI_POI\Beijing_AOI\Beijing_AOI_WG_Export.shp")
+    dbf_path = os.path.join("dataset", "GeoData", "AOI_POI", "Beijing_AOI", "Beijing_AOI_WG_Export.shp")
     table = DBF(dbf_path)
     for field in table.fields:
         print(field.name)
@@ -314,5 +314,5 @@ if __name__ == "__main__":
     # data_preprocess()
     # geoData_stats()
     Trace_dir = os.path.join("dataset\\G-csv\\stopDect")
-    out_path = os.path.join("dataset\G-csv\GeoPlus")
+    out_path = os.path.join("dataset", "G-csv", "GeoPlus")
     main(Trace_dir, out_path)

@@ -1,0 +1,90 @@
+[
+  {
+    "id": "model-000",
+    "title": "模型输出 000",
+    "userId": "000",
+    "cluster": "Cluster 4",
+    "description": "从 Python 侧导出的模型预测结果，用户 000。",
+    "observed": [
+      {
+        "lat": 40.00838,
+        "lng": 116.321124,
+        "timestamp": "05-13 10:45"
+      },
+      {
+        "lat": 40.004658,
+        "lng": 116.321912,
+        "timestamp": "05-13 10:51"
+      },
+      {
+        "lat": 40.00624,
+        "lng": 116.320765,
+        "timestamp": "05-13 10:51"
+      },
+      {
+        "lat": 40.007815,
+        "lng": 116.319702,
+        "timestamp": "05-13 10:52"
+      },
+      {
+        "lat": 40.00841,
+        "lng": 116.321323,
+        "timestamp": "05-13 10:56"
+      }
+    ],
+    "actualFuture": [
+      {
+        "lat": 40.007908,
+        "lng": 116.320194,
+        "timestamp": "05-13 11:00"
+      },
+      {
+        "lat": 39.999681,
+        "lng": 116.290036,
+        "timestamp": "05-13 11:07"
+      },
+      {
+        "lat": 40.007899,
+        "lng": 116.319296,
+        "timestamp": "05-13 11:25"
+      },
+      {
+        "lat": 40.006193,
+        "lng": 116.31306,
+        "timestamp": "05-13 11:28"
+      }
+    ],
+    "predictedFuture": [
+      {
+        "lat": 40.00966,
+        "lng": 116.321126,
+        "timestamp": "05-13 10:59"
+      },
+      {
+        "lat": 40.010861,
+        "lng": 116.320938,
+        "timestamp": "05-13 11:03"
+      },
+      {
+        "lat": 40.012013,
+        "lng": 116.320757,
+        "timestamp": "05-13 11:07"
+      },
+      {
+        "lat": 40.013119,
+        "lng": 116.320583,
+        "timestamp": "05-13 11:11"
+      }
+    ],
+    "tags": [
+      "模型输出",
+      "实际样本",
+      "仓库真实 CSV",
+      "基线预测",
+      "Python 导出"
+    ],
+    "sampleType": "actual",
+    "predictionLabel": "模型预测",
+    "sourceFile": "Trace_Web\\data\\model_predictions.json"
+  }
+]

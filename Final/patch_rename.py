@@ -1,8 +1,8 @@
 import os
 from tqdm import tqdm
 
-inpath = os.path.join("Final\stop_dect")
-outpath = os.path.join("Final\stop_dect")
+inpath = os.path.join("Final", "stop_dect")
+outpath = os.path.join("Final", "stop_dect")
 
 for file in tqdm(os.listdir(inpath)):
     if file.endswith(".csv"):

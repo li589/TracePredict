@@ -29,7 +29,7 @@ def process_trajectory_file(filename, directory):
         'latitude': x_list,
         'longitude': y_list
     })
-    df.to_csv(os.path.join("dataset\G-csv\st_prj_temp", filename), index=False)
+    df.to_csv(os.path.join("dataset", "G-csv", "st_prj_temp", filename), index=False)
     return user_id, df.values
 
 def read_trajectory_data(directory):
@@ -150,7 +150,7 @@ def group_partitions(partitions, eps=0.5, min_samples=2):
     return cluster_assignments
 
 def main():
-    directory = 'dataset\G-csv\stopDect'  # 替换为你的CSV文件文件夹路径
+    directory = os.path.join("dataset", "G-csv", "stopDect")  # 替换为你的CSV文件文件夹路径
     trajectories = read_trajectory_data(directory)
     
     # 将所有轨迹数据转换为一个数组，每行是一个轨迹点

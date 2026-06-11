@@ -1,0 +1,34 @@
+{
+  "000": {
+    "title": "模型输出 000",
+    "description": "从 Python 侧导出的模型预测结果，用户 000。",
+    "predictionLabel": "模型预测",
+    "sourceFile": "Trace_Web\\data\\model_predictions.json",
+    "tags": [
+      "模型输出",
+      "Python 导出"
+    ],
+    "predictedFuture": [
+      {
+        "lat": 40.00966,
+        "lng": 116.321126,
+        "timestamp": "05-13 10:59"
+      },
+      {
+        "lat": 40.010861,
+        "lng": 116.320938,
+        "timestamp": "05-13 11:03"
+      },
+      {
+        "lat": 40.012013,
+        "lng": 116.320757,
+        "timestamp": "05-13 11:07"
+      },
+      {
+        "lat": 40.013119,
+        "lng": 116.320583,
+        "timestamp": "05-13 11:11"
+      }
+    ]
+  }
+}

@@ -30,8 +30,8 @@ def main_mult(xlsx_dir, csv_dir):# 1287.4526s
 
 def convert_main():
     start_time = time.perf_counter()
-    xlsx_dir = 'dataset\G-xlsx'  # ./是代码路径
-    csv_dir = 'dataset\G-csv'
+    xlsx_dir = os.path.join("dataset", "G-xlsx")  # ./是代码路径
+    csv_dir = os.path.join("dataset", "G-csv")
     if not os.path.exists(csv_dir):
         os.makedirs(csv_dir)
     # main_single(xlsx_dir, csv_dir)  # single-thread

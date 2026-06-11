@@ -1,19 +1,84 @@
 import os
 import json
 import random
+import argparse
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from multiprocessing import cpu_count
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from POI_Reclass.poi_scan import main as poi_scan
-from Cluster.cluster_mod import main as data_creator, process_csv as read_time_1_csv
-from dataset.traceDect import mult_main as trace_dect
-from POI_Reclass.patch_timeslicing import main as patch_timeslicing
-from POI_Reclass.reClass_mod import load_data as reclass_load_poi_dt, main as reclass_main
-from Markov_chain import group_main as Markov_group_main, one_people_main as Markov_one_people_main, draw as draw_transMatrix
-from Cluster.Gabor_Kmeans_Cluster import img_inside_main as pre_cluster, main as cluster_main, classify_new_images as patch_new_cluster
+from trace_web_export import upsert_model_prediction, build_trace_web_model_samples
+
+def resolve_first_existing_path(*candidate_paths):
+    for path in candidate_paths:
+        if path and os.path.exists(path):
+            return path
+    raise FileNotFoundError(f"No available file in candidates: {candidate_paths}")
+
+
+def export_prediction_to_trace_web(user_id, predicted_future, title=None, description=None,
+                                   prediction_label="模型预测", source_file="main.py", tags=None):
+    """
+    将预测结果同步到 Trace_Web 的模型输出数据源。
+
+    predicted_future 需要是如下格式的列表：
+    [
+        {"lat": 40.00966, "lng": 116.321126, "timestamp": "05-13 10:59"},
+        ...
+    ]
+    """
+    if not predicted_future:
+        print("Skip Trace_Web export: predicted_future is empty.")
+        return []
+
+    upsert_model_prediction(
+        user_id,
+        predicted_future,
+        title=title,
+        description=description,
+        prediction_label=prediction_label,
+        source_file=source_file,
+        tags=tags or ["模型输出", "main.py"],
+    )
+    samples = build_trace_web_model_samples()
+    print(f"Trace_Web model samples updated: {len(samples)}")
+    return samples
+
+
+def _get_preprocess_functions():
+    from dataset.traceDect import mult_main as trace_dect
+    from POI_Reclass.poi_scan import main as poi_scan
+    from POI_Reclass.patch_timeslicing import main as patch_timeslicing
+    from POI_Reclass.reClass_mod import load_data as reclass_load_poi_dt, main as reclass_main
+
+    return trace_dect, poi_scan, patch_timeslicing, reclass_load_poi_dt, reclass_main
+
+
+def _get_cluster_functions():
+    from cluster.Gabor_Kmeans_Cluster import (
+        img_inside_main as pre_cluster,
+        main as cluster_main,
+        classify_new_images as patch_new_cluster,
+    )
+
+    return pre_cluster, cluster_main, patch_new_cluster
+
+
+def _get_markov_functions():
+    from Markov_chain import (
+        group_main as Markov_group_main,
+        one_people_main as Markov_one_people_main,
+        draw as draw_transMatrix,
+    )
+
+    return Markov_group_main, Markov_one_people_main, draw_transMatrix
+
+
+def _get_cluster_data_functions():
+    from cluster.cluster_mod import main as data_creator, process_csv as read_time_1_csv
+
+    return data_creator, read_time_1_csv
 
 class PreProcess():
     def __init__(self, core_dir):
@@ -60,16 +125,19 @@ class PreProcess():
     def Stop_dect(self):
         print('开始驻留点检测...')
         try:
+            trace_dect, _, _, _, _ = _get_preprocess_functions()
             trace_dect(self.source_dir, self.stop_dect_dir, drop_core_num=12)
         except Exception as e:
             print(f'驻留点检测出错：{e}')
     def POI_relevance(self):
         print('开始POI相关性检测...')
         try:
+            _, poi_scan, _, _, _ = _get_preprocess_functions()
             poi_scan(self.stop_dect_dir, self.POI_relevance_dir)
         except Exception as e:
             print(f'POI关联出错：{e}')
         try:
+            _, _, _, reclass_load_poi_dt, reclass_main = _get_preprocess_functions()
             poi_list, classF = reclass_load_poi_dt(self.POI_relevance_dir, 'POI')
             P_out = os.path.join(self.POI_relevance_dir, 'Probability')
             self.__auto_mkdir(P_out)
@@ -81,6 +149,7 @@ class PreProcess():
         self.__auto_mkdir(P_input_dir)
         print(f'开始进行切片，数量：{cut_number} ...')
         try:
+            _, _, patch_timeslicing, _, _ = _get_preprocess_functions()
             patch_timeslicing(cut_number, P_input_dir, 
                             self.timeCut_0_dir, self.timeCut_1_dir,
                             max_core_num)
@@ -90,6 +159,7 @@ class PreProcess():
     def make_init_cluster(self, set_cluster_num = 0):
         print('开始进行初始类别划分...')
         try:
+            pre_cluster, cluster_main, _ = _get_cluster_functions()
             pre_cluster(self.timeCut_1_dir, self.PNG_0_dir, self.PNG_1_dir) # 保存为一系列图像
             cluster_main(self.PNG_1_dir, self.model_dir, self.cluster_json_dir, set_cluster_num) # Gabor_Kmeans_Cluster_results.json
         except Exception as e:
@@ -97,6 +167,7 @@ class PreProcess():
     def make_new_cluster(self, model_dir):
         print('开始进行新类别划分...')
         try:
+            pre_cluster, _, patch_new_cluster = _get_cluster_functions()
             pre_cluster(self.timeCut_1_dir, self.PNG_0_dir, self.PNG_1_dir) # 保存为一系列图像
             patch_new_cluster(self.PNG_1_dir, model_dir, self.cluster_json_dir) # classification_results.json
         except Exception as e:
@@ -104,8 +175,25 @@ class PreProcess():
     def update_cluster_info(self, init_cluster_json = 'Gabor_Kmeans_Cluster_results.json', additon_cluster_json = 'classification_results.json'):
         print('开始进行类别信息更新...')
         try:
-            data1 = json.loads(init_cluster_json)
-            data2 = json.loads(additon_cluster_json)
+            def load_cluster_json(json_input):
+                if isinstance(json_input, dict):
+                    return json_input
+                if not isinstance(json_input, str):
+                    raise TypeError("cluster json input must be dict or str")
+
+                candidate_paths = [json_input]
+                if not os.path.isabs(json_input):
+                    candidate_paths.append(os.path.join(self.cluster_json_dir, json_input))
+
+                for candidate in candidate_paths:
+                    if os.path.exists(candidate):
+                        with open(candidate, 'r', encoding='utf-8') as file:
+                            return json.load(file)
+
+                return json.loads(json_input)
+
+            data1 = load_cluster_json(init_cluster_json)
+            data2 = load_cluster_json(additon_cluster_json)
             merged_data = {}
             for key in set(data1) | set(data2):
                 if key in data1 and key in data2:
@@ -164,10 +252,10 @@ class core_MarkovChain():
     def __read_private_csv_matrix(self, csv_path):
         one = pd.read_csv(csv_path, header=None)
         h, w = one.shape
-        row_index = list(range(h))
         empty_rows = one.isnull().any(axis=1)
-        useful_rows = sorted(list(set(row_index)-set(empty_rows)))
-        one[empty_rows] = [1.0/w for _ in range(w)]
+        useful_rows = one.index[~empty_rows].tolist()
+        if empty_rows.any():
+            one.loc[empty_rows, :] = [[1.0 / w for _ in range(w)] for _ in range(int(empty_rows.sum()))]
         data_matrix = np.array(one.values) # one people matrix
         print(f"OK line: {useful_rows}")
         return data_matrix, useful_rows
@@ -183,14 +271,12 @@ class core_MarkovChain():
             group_transMatrix = self.big_cluster_matrix_dict[cluster_name]
         else:
             print(f"cluster_name {cluster_name} is not in cluster_matrix_dict.")
-        if cluster_name in self.private_matrix_dict.keys():
-            try:
-                private_transMatrix = self.private_matrix_dict[id]
-            except Exception as e:
-                private_transMatrix = self.private_matrix_dict[f'{id}']
-                print(f"Warning: Key of private_matrix_dict is not {type(id)}.")
-            finally:
-                print(f"people {id} is not in private_matrix_dict.")
+        private_key = id if id in self.private_matrix_dict else f'{id}'
+        if private_key in self.private_matrix_dict:
+            private_transMatrix = self.private_matrix_dict[private_key]
+        else:
+            print(f"people {id} is not in private_matrix_dict.")
+            raise KeyError(id)
         p_height, p_width = np.array(private_transMatrix).shape
         g_height, g_width = np.array(group_transMatrix).shape
         if p_height!= g_height or p_width!= g_width:
@@ -228,6 +314,8 @@ class core_MarkovChain():
         self.private_supportline_dict = private_supportline_dict
     def output_init_transMatrix_data(self, cluster_file): # Gabor_Kmeans_Cluster_results.json or classification_results.json or all
         print("Initial transMatrix data")
+        data_creator, _ = _get_cluster_data_functions()
+        Markov_group_main, Markov_one_people_main, _ = _get_markov_functions()
         data, data_id, data_shp = data_creator(self.workspace_dir_object.timeCut_1_dir)
         out_put_dir = os.path.join(self.workspace_dir_object.markov_core_dir)
         with ProcessPoolExecutor(max_workers=2) as executor:
@@ -242,6 +330,8 @@ class core_MarkovChain():
             print(result)
     def create_private_transMatrix(self):
         print("Create private transMatrix data")
+        data_creator, _ = _get_cluster_data_functions()
+        _, Markov_one_people_main, _ = _get_markov_functions()
         data, data_id, data_shp = data_creator(self.workspace_dir_object.timeCut_1_dir)
         out_put_dir = os.path.join(self.workspace_dir_object.markov_core_dir)
         Markov_one_people_main(data, data_id, data_shp, out_put_dir)
@@ -288,6 +378,7 @@ class core_MarkovChain():
 
     def do_pred(self, id, training_rows, prediction_steps, initial_states = 0):
         print("Do pred ...")
+        _, read_time_1_csv = _get_cluster_data_functions()
         file_list = os.listdir(self.workspace_dir_object.timeCut_1_dir)
         data = None
         for i in file_list:
@@ -382,6 +473,7 @@ class test_Evaluator():
     
     def matrix_draw(self, *args):
         matrix_num = len(args)
+        _, _, draw_transMatrix = _get_markov_functions()
         with ProcessPoolExecutor(max_workers=matrix_num if matrix_num < cpu_count() else cpu_count()) as executor:
             futures = []
             for i in args:
@@ -390,72 +482,37 @@ class test_Evaluator():
             for future in as_completed(futures):
                 result = future.result()
                 print(result)
-def main():
-    reclass_list = {
-        '0': '0',  # 医疗保健
-        '1': '1',  # 交通设施
-        '2': '2',  # 酒店住宿
-        '3': '3',  # 购物消费
-        '4': '4',  # 餐饮美食
-        '5': '5',  # 公司企业
-        '6': '6',  # 运动健身
-        '7': '7',  # 科教文化
-        '8': '5',  # 金融机构
-        '9': '6',  # 休闲娱乐
-        '10': '8',  # 汽车相关
-        '11': '9',  # 商务住宅
-        '12': '10',  # 旅游景点
-        '13': '8',  # 生活服务
-        '14': '11'  # 政府机构
-        # '15': '10'  # 道路
-    }
-    core_dir = "Final"
-    cluster_json = os.path.join(core_dir, "Cluster/json/classification_results.json")
-    big_cluster_matrix_json = os.path.join("dataset/G-csv/Core/Markov_chain/transition_matrix_result.json")
-    private_matrix_csv_filepath = os.path.join("dataset\G-csv\Core\Markov_chain")
+
+
+def create_markov_model(core_dir="Final"):
+    cluster_json = resolve_first_existing_path(
+        os.path.join(core_dir, "Cluster", "json", "classification_results.json"),
+        os.path.join(core_dir, "Cluster", "json", "cluster_final.json"),
+        os.path.join("cluster", "classification_results.json"),
+        os.path.join("cluster", "Gabor_Kmeans_Cluster_results.json"),
+    )
+    big_cluster_matrix_json = resolve_first_existing_path(
+        os.path.join(core_dir, "Core", "Markov", "transition_matrix_result.json"),
+        os.path.join(core_dir, "Core", "Markov", "transition_matrix.json"),
+        os.path.join("dataset", "G-csv", "Core", "Markov_chain", "transition_matrix_result.json"),
+        os.path.join("dataset", "G-csv", "Core", "Markov_chain", "transition_matrix.json"),
+    )
+    private_matrix_csv_filepath = os.path.join("dataset", "G-csv", "Core", "Markov_chain")
     Markov_model = core_MarkovChain(core_dir)
     Markov_model.set_preprocess_path()
     # Markov_model.gen_new_data(model_dir = 'cluster\model', cut_number = 48)
     Markov_model.read_data(cluster_json, big_cluster_matrix_json, private_matrix_csv_filepath)
-    # Markov_model.create_private_transMatrix()
+    return Markov_model
 
-    # id = 000
-    # training_rows = [1,2,3,7,8,9,11,23]
-    # pred_step = 3
-    # res, dt, _x = Markov_model.do_pred(id, training_rows, pred_step)
-    # res_evaluator = test_Evaluator()
-    # res_evaluator.matrix_similarity_evaluator(res, dt)
-    
-    ##########################################################################
-    id = 000
-    training_rows = 48
-    value = np.zeros((training_rows, training_rows))
-    # training_rows = range(random.randint(20, 48))
-    training_rows = range(40)
-    print("Training rows: {}".format(training_rows))
-    # for i in range(0, training_rows):
-        # training_rows = range(i)
-    for i in range(1,47):
-        pred_step = i
-        res, dt, _x = Markov_model.do_pred(id, sorted(training_rows), pred_step)
-        res_evaluator = test_Evaluator()
-        v1, v2, v3 = res_evaluator.matrix_similarity_evaluator(res, dt)
-        difference, std_differ, mean_value= res_evaluator.matrix_differ_clac(res, dt)
-        value[i, 0] = i
-        value[i, 1] = v1
-        value[i, 2] = v2
-        value[i, 3] = v3
-        value[i, 4] = std_differ
-        value[i, 5] = mean_value
-        # res_evaluator.matrix_draw(res, dt, difference)
-        
+
+def plot_evaluation_curves(value):
     plt.figure(figsize=(10, 10))
-    plt.plot(value[:, 0], value[:, 1], label='Cosine Similarity')  # 确保只绘制一条线
+    plt.plot(value[:, 0], value[:, 1], label='Cosine Similarity')
     max_idx = np.argmax(value[:, 1])
     min_idx = np.argmin(value[:, 1])
-    plt.text(value[max_idx, 0], value[max_idx, 1], f'Max: {value[max_idx, 1]:.2f}', 
+    plt.text(value[max_idx, 0], value[max_idx, 1], f'Max: {value[max_idx, 1]:.2f}',
              color='red', fontsize=10)
-    plt.text(value[min_idx, 0], value[min_idx, 1], f'Min: {value[min_idx, 1]:.2f}', 
+    plt.text(value[min_idx, 0], value[min_idx, 1], f'Min: {value[min_idx, 1]:.2f}',
              color='blue', fontsize=10)
     plt.title("Cosine Similarity")
     plt.xlabel("pred_step")
@@ -465,10 +522,10 @@ def main():
 
     plt.figure(figsize=(10,10))
     plt.plot(value[:, 0], value[:, 2])
-    plt.text(value[:, 0][np.argmax(value[:, 2])] + 3, np.max(value[:, 2]), f'Max: {np.max(value[:, 2]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
-    plt.text(value[:, 0][np.argmin(value[:, 2])] - 3, np.min(value[:, 2]), f'Max: {np.min(value[:, 2]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmax(value[:, 2])] + 3, np.max(value[:, 2]), f'Max: {np.max(value[:, 2]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmin(value[:, 2])] - 3, np.min(value[:, 2]), f'Max: {np.min(value[:, 2]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
     plt.title("Euclidean Similarity")
     plt.xlabel("pred_step")
     plt.ylabel("euclidean")
@@ -477,10 +534,10 @@ def main():
 
     plt.figure(figsize=(10,10))
     plt.plot(value[:, 0], value[:, 3])
-    plt.text(value[:, 0][np.argmax(value[:, 3])] + 3, np.max(value[:, 3]), f'Max: {np.max(value[:, 3]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
-    plt.text(value[:, 0][np.argmin(value[:, 3])] - 3, np.min(value[:, 3]), f'Max: {np.min(value[:, 3]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmax(value[:, 3])] + 3, np.max(value[:, 3]), f'Max: {np.max(value[:, 3]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmin(value[:, 3])] - 3, np.min(value[:, 3]), f'Max: {np.min(value[:, 3]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
     plt.title("Pearson Similarity")
     plt.xlabel("pred_step")
     plt.ylabel("pearson")
@@ -489,10 +546,10 @@ def main():
 
     plt.figure(figsize=(10,10))
     plt.plot(value[:, 0], value[:, 4])
-    plt.text(value[:, 0][np.argmax(value[:, 4])] + 3, np.max(value[:, 4]), f'Max: {np.max(value[:, 4]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
-    plt.text(value[:, 0][np.argmin(value[:, 4])] - 3, np.min(value[:, 4]), f'Max: {np.min(value[:, 4]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmax(value[:, 4])] + 3, np.max(value[:, 4]), f'Max: {np.max(value[:, 4]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmin(value[:, 4])] - 3, np.min(value[:, 4]), f'Max: {np.min(value[:, 4]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
     plt.title("Standard Deviation of the Difference Matrix")
     plt.xlabel("pred_step")
     plt.ylabel("std_differ")
@@ -501,15 +558,78 @@ def main():
 
     plt.figure(figsize=(10,10))
     plt.plot(value[:, 0], value[:, 5])
-    plt.text(value[:, 0][np.argmax(value[:, 5])] + 3, np.max(value[:, 5]), f'Max: {np.max(value[:, 5]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
-    plt.text(value[:, 0][np.argmin(value[:, 5])] - 3, np.min(value[:, 5]), f'Max: {np.min(value[:, 5]):.2f}', 
-         horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmax(value[:, 5])] + 3, np.max(value[:, 5]), f'Max: {np.max(value[:, 5]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
+    plt.text(value[:, 0][np.argmin(value[:, 5])] - 3, np.min(value[:, 5]), f'Max: {np.min(value[:, 5]):.2f}',
+        horizontalalignment='right', verticalalignment='bottom', color='red')
     plt.title("Mean of the Difference Matrix")
     plt.xlabel("pred_step")
     plt.ylabel("mean_value")
     plt.grid(True)
     plt.show()
+
+
+def run_markov_evaluation(user_id=0, training_limit=40, max_pred_step=5, show_plots=False, core_dir="Final"):
+    markov_model = create_markov_model(core_dir=core_dir)
+    training_rows = range(training_limit)
+    value = np.zeros((max_pred_step + 1, 6))
+    print("Training rows: {}".format(training_rows))
+
+    for pred_step in range(1, max_pred_step + 1):
+        res, dt, _x = markov_model.do_pred(user_id, sorted(training_rows), pred_step)
+        res_evaluator = test_Evaluator()
+        v1, v2, v3 = res_evaluator.matrix_similarity_evaluator(res, dt)
+        _, std_differ, mean_value = res_evaluator.matrix_differ_clac(res, dt)
+        value[pred_step, 0] = pred_step
+        value[pred_step, 1] = v1
+        value[pred_step, 2] = v2
+        value[pred_step, 3] = v3
+        value[pred_step, 4] = std_differ
+        value[pred_step, 5] = mean_value
+
+    if show_plots:
+        plot_evaluation_curves(value)
+
+    return value
+
+
+def build_arg_parser():
+    parser = argparse.ArgumentParser(description="TracePredict Markov 主线运行入口")
+    parser.add_argument("--core-dir", default="Final", help="主线数据目录")
+    parser.add_argument("--user-id", type=int, default=0, help="用于评估的用户 ID")
+    parser.add_argument("--training-limit", type=int, default=40, help="训练片段上限")
+    parser.add_argument("--max-pred-step", type=int, default=5, help="最大预测步数，默认使用较短 smoke 值")
+    parser.add_argument("--show-plots", action="store_true", help="是否显示评估图表")
+    parser.add_argument("--export-trace-web", action="store_true", help="是否将预测结果同步到 Trace_Web")
+    return parser
+
+
+def main(argv=None):
+    args = build_arg_parser().parse_args(argv)
+
+    value = run_markov_evaluation(
+        user_id=args.user_id,
+        training_limit=args.training_limit,
+        max_pred_step=args.max_pred_step,
+        show_plots=args.show_plots,
+        core_dir=args.core_dir,
+    )
+
+    print("Evaluation matrix:")
+    print(value[1:args.max_pred_step + 1, :])
+
+    # 将这里替换成你的真实预测点列表后，运行 main.py --export-trace-web 就会自动同步到 Trace_Web。
+    trace_web_predicted_future = []
+    if args.export_trace_web:
+        export_prediction_to_trace_web(
+            args.user_id,
+            trace_web_predicted_future,
+            title=f"模型输出 {int(args.user_id):03d}",
+            description="从 main.py 导出的模型预测结果。",
+            prediction_label="模型预测",
+            source_file="main.py",
+            tags=["Markov", "main.py"],
+        )
     
 if __name__ == "__main__":
     main()

@@ -45,8 +45,8 @@ def gen_csv(input_filename, input_dirpth, output_pth):
                     writer.writerow({'var1': data[0], 'var2': data[1], 'var3': data[2], 'var4': data[3], 'var5': data[4], 'var6': data[5], 'var7': data[6]})
 
 def main():
-    input_dir = 'dataset\SourceData'
-    output_dir = 'dataset\G-csv'
+    input_dir = os.path.join("dataset", "SourceData")
+    output_dir = os.path.join("dataset", "G-csv")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     dir_list = gen_dir_path(input_dir)

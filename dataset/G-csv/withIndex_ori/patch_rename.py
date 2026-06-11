@@ -1,8 +1,8 @@
 import os
 from tqdm import tqdm
 
-inpath = os.path.join("dataset\G-csv\withIndex_ori\\2")
-outpath = os.path.join("dataset\G-csv\withIndex_ori\\1")
+inpath = os.path.join("dataset", "G-csv", "withIndex_ori", "2")
+outpath = os.path.join("dataset", "G-csv", "withIndex_ori", "1")
 
 for file in tqdm(os.listdir(inpath)):
     if file.endswith(".csv"):

@@ -304,7 +304,7 @@ if __name__ == "__main__":
     out_png_dir = os.path.join("dataset\\G-csv\\Core\\PNG")
     image_folder = os.path.join(out_png_dir, "result")  # 替换为你的图片文件夹路径
     img_inside_main(csv_dir, out_png_dir, image_folder)
-    model_path = "cluster\model"
+    model_path = os.path.join("cluster", "model")
     json_path = "cluster"
     main(image_folder, model_path, json_path)
     classify_new_images(image_folder, model_path, json_path)

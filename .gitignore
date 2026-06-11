@@ -1,0 +1,22 @@
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+
+# Generated experiment logs and figures
+dataset/logs/
+evaluate/
+Final/Cluster/PNG0/
+Final/Cluster/PNG1/
+dataset/G-csv/Core/PNG/
+
+# Frontend local build outputs
+Trace_Web/node_modules/
+Trace_Web/dist/
